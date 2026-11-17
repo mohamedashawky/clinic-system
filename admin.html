@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>لوحة تحكم العيادة - السكرتارية والطبيب</title>
+  <style>
+    :root {
+      --primary: #0f766e;
+      --primary-dark: #115e59;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #cbd5e1;
+    }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    .topbar {
+      background: #0f172a; color: #fff; padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+    }
+    .container { max-width: 1150px; margin: 20px auto; padding: 0 16px; }
+    .card { background: var(--card); border-radius: 14px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border); background: #fff;
+      font-weight: 700; cursor: pointer;
+    }
+    .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .stat-box { background: #fff; padding: 14px; border-radius: 12px; border: 1px solid var(--border); text-align: center; }
+    .stat-box .num { font-size: 1.7rem; font-weight: 800; color: var(--primary); }
+    input, select, textarea {
+      width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;
+    }
+    .btn {
+      background: var(--primary); color: #fff; border: none; padding: 9px 15px; border-radius: 8px;
+      font-weight: 700; cursor: pointer; font-size: 0.9rem;
+    }
+    .btn:hover { background: var(--primary-dark); }
+    .btn-sm { padding: 5px 10px; font-size: 0.82rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; color: #fff; }
+    .btn-enter { background: #0284c7; }
+    .btn-done { background: #16a34a; }
+    .btn-noshow { background: #d97706; }
+    .btn-cancel { background: #dc2626; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; }
+    th { background: #f8fafc; }
+    .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: 700; }
+    .st-Waiting { background: #fef3c7; color: #92400e; }
+    .st-InConsultation { background: #dbeafe; color: #1e40af; }
+    .st-Completed { background: #dcfce7; color: #166534; }
+    .st-NoShow { background: #fee2e2; color: #991b1b; }
+    .st-Cancelled { background: #e2e8f0; color: #475569; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <strong>🏥 لوحة تحكم العيادة والسكرتارية</strong>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <a href="/" target="_blank" style="color:#5eead4; text-decoration:none; font-size:0.9rem;">فتح صفحة المرضى ↗</a>
+    <button id="logoutBtn" class="btn-sm btn-cancel" style="display:none;" onclick="logout()">تسجيل خروج</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- شاشة تسجيل الدخول -->
+  <div id="loginBox" class="card" style="max-width:420px; margin:60px auto;">
+    <h2 style="margin-top:0;">🔐 دخول الإدارة والسكرتارية</h2>
+    <p style="font-size:0.88rem; color:var(--muted);">كلمة المرور الافتراضية للتجربة: <code>admin1234</code></p>
+    <form id="loginForm">
+      <div style="margin-bottom:12px;">
+        <input type="password" id="adminPass" placeholder="أدخل كلمة المرور" required />
+      </div>
+      <button type="submit" class="btn" style="width:100%;">دخول لوحة التحكم</button>
+    </form>
+    <p id="loginErr" style="color:#dc2626; font-size:0.9rem; margin-top:10px;"></p>
+  </div>
+
+  <!-- لوحة التحكم الرئيسية -->
+  <div id="dashboardBox" style="display:none;">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('queueTab', this)">📋 طابور اليوم والحجوزات</button>
+      <button class="tab-btn" onclick="switchTab('scheduleTab', this)">📅 مواعيد العمل والإجازات</button>
+      <button class="tab-btn" onclick="switchTab('profileTab', this)">🩺 بيانات الطبيب والشهادات</button>
+    </div>
+
+    <!-- التبويب 1: إدارة الطابور -->
+    <div id="queueTab">
+      <div class="stats-row">
+        <div class="stat-box"><div class="num" id="stTotal">0</div><div>إجمالي حجوزات اليوم</div></div>
+        <div class="stat-box"><div class="num" id="stCurrent">-</div><div>بالداخل عند الدكتور</div></div>
+        <div class="stat-box"><div class="num" id="stWaiting">0</div><div>في الانتظار</div></div>
+        <div class="stat-box"><div class="num" id="stCompleted">0</div><div>تم الكشف</div></div>
+      </div>
+
+      <!-- إضافة مريض Walk-in -->
+      <div class="card">
+        <h3 style="margin-top:0;">➕ إضافة مريض حضر للعيادة مباشرة (Walk-in)</h3>
+        <form id="walkinForm" style="display:grid; grid-template-columns: 2fr 1.5fr 1fr auto; gap:10px;">
+          <input type="text" id="wiName" placeholder="اسم المريض" required />
+          <input type="text" id="wiPhone" placeholder="رقم الموبايل (اختياري)" />
+          <select id="wiType">
+            <option value="New">كشف جديد</option>
+            <option value="FollowUp">استشارة</option>
+          </select>
+          <button type="submit" class="btn">إضافة للطابور</button>
+        </form>
+      </div>
+
+      <!-- جدول الطابور -->
+      <div class="card" style="overflow-x:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">قائمة المرضى</h3>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="date" id="queueDateFilter" onchange="loadQueue()" style="width:auto;" />
+            <button class="btn" onclick="loadQueue()">تحديث</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>الدور</th>
+              <th>الكود</th>
+              <th>اسم المريض</th>
+              <th>الموبايل</th>
+              <th>النوع / المصدر</th>
+              <th>الحالة</th>
+              <th>إجراءات سريعة</th>
+            </tr>
+          </thead>
+          <tbody id="queueTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- التبويب 2: المواعيد والإجازات -->
+    <div id="scheduleTab" style="display:none;">
+      <div class="card">
+        <h3 style="margin-top:0;">🕒 جدول مواعيد العيادة الأسبوعي</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>اليوم</th>
+              <th>مفتوح؟</th>
+              <th>من الساعة</th>
+              <th>إلى الساعة</th>
+              <th>الحد الأقصى للمرضى</th>
+            </tr>
+          </thead>
+          <tbody id="adminScheduleBody"></tbody>
+        </table>
+        <button class="btn" style="margin-top:14px;" onclick="saveSchedule()">حفظ جدول المواعيد</button>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">🚫 إغلاق يوم محدد (إجازة طارئة)</h3>
+        <form id="holidayForm" style="display:grid; grid-template-columns: 1fr 2fr auto; gap:10px; margin-bottom:14px;">
+          <input type="date" id="holDate" required />
+          <input type="text" id="holReason" placeholder="سبب الإجازة (مثال: مؤتمر طبي)" required />
+          <button type="submit" class="btn">إغلاق اليوم</button>
+        </form>
+        <table>
+          <thead><tr><th>التاريخ</th><th>السبب</th><th>حذف</th></tr></thead>
+          <tbody id="holidaysBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- التبويب 3: بيانات الطبيب والشهادات -->
+    <div id="profileTab" style="display:none;">
+      <div class="card">
+        <h3 style="margin-top:0;">✏️ تعديل بيانات الدكتور والأسعار</h3>
+        <form id="profileForm">
+          <div class="grid-2">
+            <div><label>اسم الدكتور</label><input type="text" id="pName" required /></div>
+            <div><label>التخصص</label><input type="text" id="pSpec" required /></div>
+            <div><label>سعر الكشف (ج.م)</label><input type="number" id="pNewPrice" required /></div>
+            <div><label>سعر الاستشارة (ج.م)</label><input type="number" id="pFollowPrice" required /></div>
+            <div><label>متوسط مدة الكشف (بالدقائق)</label><input type="number" id="pAvgMins" required /></div>
+            <div><label>تليفون العيادة</label><input type="text" id="pPhone" required /></div>
+            <div><label>العنوان بالتفصيل</label><input type="text" id="pAddress" required /></div>
+            <div><label>رابط Google Maps</label><input type="text" id="pMaps" required /></div>
+          </div>
+          <div style="margin-top:12px;">
+            <label>النبذة والتاريخ المهني</label>
+            <textarea id="pBio" rows="3" required></textarea>
+          </div>
+          <button type="submit" class="btn" style="margin-top:14px;">حفظ التعديلات</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">🎓 إضافة شهادة أو زمالة جديدة</h3>
+        <form id="certForm" style="display:grid; grid-template-columns: 2fr 1.5fr 1fr 2fr auto; gap:10px; align-items:end;">
+          <div><label>اسم الشهادة</label><input type="text" id="cTitle" placeholder="زمالة أمراض القلب" required /></div>
+          <div><label>الجهة المانحة</label><input type="text" id="cIssuer" placeholder="جامعة القاهرة" required /></div>
+          <div><label>السنة</label><input type="text" id="cYear" placeholder="2020" required /></div>
+          <div><label>صورة الشهادة</label><input type="file" id="cImage" accept="image/*" required /></div>
+          <button type="submit" class="btn">رفع</button>
+        </form>
+        <div id="adminCertsList" style="margin-top:16px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let token = localStorage.getItem("clinic_admin_token") || "";
+  let cachedSchedule = [];
+
+  function escapeHtml(str) {
+    return String(str ?? "").replace(/[&<>"']/g, m => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[m]));
+  }
+
+  function authHeaders(json = true) {
+    const h = { "Authorization": `Bearer ${token}` };
+    if (json) h["Content-Type"] = "application/json";
+    return h;
+  }
+
+  function switchTab(tabId, btn) {
+    ["queueTab", "scheduleTab", "profileTab"].forEach(id => {
+      document.getElementById(id).style.display = id === tabId ? "block" : "none";
+    });
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: document.getElementById("adminPass").value })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById("loginErr").textContent = data.detail || "خطأ في الدخول";
+      return;
+    }
+    token = data.token;
+    localStorage.setItem("clinic_admin_token", token);
+    initDashboard();
+  });
+
+  function logout() {
+    localStorage.removeItem("clinic_admin_token");
+    location.reload();
+  }
+
+  async function initDashboard() {
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("dashboardBox").style.display = "block";
+    document.getElementById("logoutBtn").style.display = "inline-block";
+
+    await loadQueue();
+    await loadAdminClinicData();
+    await loadHolidays();
+  }
+
+  const statusLabels = {
+    Waiting: "في الانتظار",
+    InConsultation: "بالداخل حالياً",
+    Completed: "تم الكشف",
+    NoShow: "لم يحضر",
+    Cancelled: "ملغي"
+  };
+
+  async function loadQueue() {
+    const dateVal = document.getElementById("queueDateFilter").value;
+    const url = dateVal ? `/api/admin/queue?date=${dateVal}` : "/api/admin/queue";
+    const res = await fetch(url, { headers: authHeaders() });
+    if (res.status === 401) return logout();
+
+    const data = await res.json();
+    document.getElementById("queueDateFilter").value = data.date;
+    document.getElementById("stTotal").textContent = data.stats.total;
+    document.getElementById("stCurrent").textContent = data.stats.in_consultation ? `#${data.stats.in_consultation}` : "-";
+    document.getElementById("stWaiting").textContent = data.stats.waiting;
+    document.getElementById("stCompleted").textContent = data.stats.completed;
+
+    const tbody = document.getElementById("queueTableBody");
+    if (data.appointments.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#64748b;">لا توجد حجوزات في هذا اليوم.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.appointments.map(a => `
+      <tr>
+        <td><strong>#${a.queue_number}</strong></td>
+        <td><code>${escapeHtml(a.booking_code)}</code></td>
+        <td><strong>${escapeHtml(a.patient_name)}</strong></td>
+        <td>${escapeHtml(a.patient_phone)}</td>
+        <td>${a.visit_type === "New" ? "كشف" : "استشارة"} (${a.source === "Online" ? "أونلاين" : "مباشر"})</td>
+        <td><span class="badge st-${a.status}">${statusLabels[a.status]}</span></td>
+        <td style="display:flex; gap:5px; flex-wrap:wrap;">
+          <button class="btn-sm btn-enter" onclick="updateStatus(${a.id}, 'InConsultation')">دخول الكشف</button>
+          <button class="btn-sm btn-done" onclick="updateStatus(${a.id}, 'Completed')">تم</button>
+          <button class="btn-sm btn-noshow" onclick="updateStatus(${a.id}, 'NoShow')">لم يحضر</button>
+          <button class="btn-sm btn-cancel" onclick="updateStatus(${a.id}, 'Cancelled')">إلغاء</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  async function updateStatus(id, status) {
+    await fetch(`/api/admin/appointments/${id}/status`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ status })
+    });
+    loadQueue();
+  }
+
+  document.getElementById("walkinForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const res = await fetch("/api/admin/queue/walk-in", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        patient_name: document.getElementById("wiName").value,
+        patient_phone: document.getElementById("wiPhone").value,
+        visit_type: document.getElementById("wiType").value
+      })
+    });
+    if (res.ok) {
+      document.getElementById("wiName").value = "";
+      document.getElementById("wiPhone").value = "";
+      loadQueue();
+    }
+  });
+
+  async function loadAdminClinicData() {
+    const res = await fetch("/api/clinic-info");
+    const data = await res.json();
+    const p = data.profile;
+
+    document.getElementById("pName").value = p.name;
+    document.getElementById("pSpec").value = p.specialty;
+    document.getElementById("pNewPrice").value = p.new_visit_price;
+    document.getElementById("pFollowPrice").value = p.followup_price;
+    document.getElementById("pAvgMins").value = p.avg_consultation_mins;
+    document.getElementById("pPhone").value = p.phone;
+    document.getElementById("pAddress").value = p.address;
+    document.getElementById("pMaps").value = p.maps_url;
+    document.getElementById("pBio").value = p.bio;
+
+    cachedSchedule = data.schedule;
+    document.getElementById("adminScheduleBody").innerHTML = cachedSchedule.map((d, idx) => `
+      <tr>
+        <td><strong>${escapeHtml(d.day_name)}</strong></td>
+        <td><input type="checkbox" id="schOpen_${idx}" ${d.is_open ? "checked" : ""} style="width:auto;" /></td>
+        <td><input type="time" id="schStart_${idx}" value="${d.start_time}" /></td>
+        <td><input type="time" id="schEnd_${idx}" value="${d.end_time}" /></td>
+        <td><input type="number" id="schMax_${idx}" value="${d.max_patients}" /></td>
+      </tr>
+    `).join("");
+
+    document.getElementById("adminCertsList").innerHTML = data.certificates.map(c => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #e2e8f0;">
+        <span><strong>${escapeHtml(c.title)}</strong> - ${escapeHtml(c.issuer)} (${escapeHtml(c.year)})</span>
+        <button class="btn-sm btn-cancel" onclick="deleteCert(${c.id})">حذف</button>
+      </div>
+    `).join("");
+  }
+
+  async function saveSchedule() {
+    const payload = cachedSchedule.map((d, idx) => ({
+      weekday_num: d.weekday_num,
+      is_open: document.getElementById(`schOpen_${idx}`).checked ? 1 : 0,
+      start_time: document.getElementById(`schStart_${idx}`).value,
+      end_time: document.getElementById(`schEnd_${idx}`).value,
+      max_patients: parseInt(document.getElementById(`schMax_${idx}`).value, 10) || 0
+    }));
+
+    const res = await fetch("/api/admin/schedule", {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) alert("تم حفظ مواعيد العمل بنجاح!");
+  }
+
+  async function loadHolidays() {
+    const res = await fetch("/api/admin/holidays", { headers: authHeaders() });
+    const data = await res.json();
+    document.getElementById("holidaysBody").innerHTML = data.holidays.map(h => `
+      <tr>
+        <td>${escapeHtml(h.holiday_date)}</td>
+        <td>${escapeHtml(h.reason)}</td>
+        <td><button class="btn-sm btn-cancel" onclick="deleteHoliday(${h.id})">حذف</button></td>
+      </tr>
+    `).join("");
+  }
+
+  document.getElementById("holidayForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const res = await fetch("/api/admin/holidays", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        holiday_date: document.getElementById("holDate").value,
+        reason: document.getElementById("holReason").value
+      })
+    });
+    if (res.ok) {
+      document.getElementById("holReason").value = "";
+      loadHolidays();
+    } else {
+      const err = await res.json();
+      alert(err.detail);
+    }
+  });
+
+  async function deleteHoliday(id) {
+    await fetch(`/api/admin/holidays/${id}`, { method: "DELETE", headers: authHeaders() });
+    loadHolidays();
+  }
+
+  document.getElementById("profileForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const res = await fetch("/api/admin/profile", {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        name: document.getElementById("pName").value,
+        specialty: document.getElementById("pSpec").value,
+        new_visit_price: parseInt(document.getElementById("pNewPrice").value, 10),
+        followup_price: parseInt(document.getElementById("pFollowPrice").value, 10),
+        avg_consultation_mins: parseInt(document.getElementById("pAvgMins").value, 10),
+        phone: document.getElementById("pPhone").value,
+        address: document.getElementById("pAddress").value,
+        maps_url: document.getElementById("pMaps").value,
+        bio: document.getElementById("pBio").value
+      })
+    });
+    if (res.ok) alert("تم تحديث بيانات الدكتور بنجاح!");
+  });
+
+  document.getElementById("certForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.append("title", document.getElementById("cTitle").value);
+    fd.append("issuer", document.getElementById("cIssuer").value);
+    fd.append("year", document.getElementById("cYear").value);
+    fd.append("image", document.getElementById("cImage").files[0]);
+
+    const res = await fetch("/api/admin/certificates", {
+      method: "POST",
+      headers: authHeaders(false),
+      body: fd
+    });
+    if (res.ok) {
+      document.getElementById("certForm").reset();
+      loadAdminClinicData();
+    } else {
+      const err = await res.json();
+      alert(err.detail);
+    }
+  });
+
+  async function deleteCert(id) {
+    await fetch(`/api/admin/certificates/${id}`, { method: "DELETE", headers: authHeaders() });
+    loadAdminClinicData();
+  }
+
+  if (token) initDashboard();
+</script>
+</body>
+</html>
